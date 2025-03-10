@@ -11,19 +11,68 @@
         canvas {
             display: block;
         }
-        #slider {
+        #controls {
             position: absolute;
             bottom: 20px;
             right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #slider {
             width: 100px;
+        }
+        #heightInput {
+            width: 60px;
+            padding: 2px 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        #dropButton {
+            padding: 5px 10px;
+            background: #ff0000;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #dropButton:hover {
+            background: #cc0000;
+        }
+        #instructions {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+        }
+        #heightDisplay {
+            font-family: Arial, sans-serif;
         }
     </style>
 </head>
 <body>
-    <input type="range" id="slider" min="0" max="100" value="100">
+    <div id="instructions">
+        <h3>Controls:</h3>
+        <p>• Spacebar or Drop Button: Drop the ball</p>
+        <p>• Slider: Adjust starting height (0-40m)</p>
+        <p>• Mouse: Drag the ball around</p>
+    </div>
+    <div id="controls">
+        <div id="heightDisplay">Height: 0m</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="range" id="slider" min="0" max="100" value="100">
+            <input type="number" id="heightInput" min="0" max="40" step="0.1" value="40">
+        </div>
+        <button id="dropButton">Drop Ball</button>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script>
-        // Matter.js module aliases
         const Engine = Matter.Engine,
               Render = Matter.Render,
               World = Matter.World,
@@ -33,11 +82,9 @@
               Mouse = Matter.Mouse,
               MouseConstraint = Matter.MouseConstraint;
 
-        // Create engine
         const engine = Engine.create();
         engine.world.gravity.y = 3;
 
-        // Create renderer
         const render = Render.create({
             element: document.body,
             engine: engine,
@@ -49,11 +96,9 @@
             }
         });
 
-        // Scale factor
         const scale = 1.5;
         let currentBall = null;
 
-        // Function to create static terrain
         function createStaticBodies(height) {
             const existingTerrain = engine.world.bodies.filter(body => body.label === 'mountain');
             World.remove(engine.world, existingTerrain);
@@ -116,7 +161,6 @@
             return terrainPoints[0];
         }
 
-        // Function to drop ball
         function dropBall(point) {
             if (currentBall) {
                 World.remove(engine.world, currentBall);
@@ -137,39 +181,59 @@
             World.add(engine.world, currentBall);
         }
 
-        // Initial setup
         let startPoint = createStaticBodies(10);
 
-        // Slider handling
         const slider = document.getElementById('slider');
-        slider.addEventListener('input', () => {
-            const sliderValue = parseInt(slider.value);
-            let height;
-            
-            // Base height at slider = 100 is 10
-            const baseHeight = 10;
-            // Max height when slider = 0
-            const maxHeight = 130;
-            
-            // Normalize slider value (0 to 1)
+        const heightInput = document.getElementById('heightInput');
+        const heightDisplay = document.getElementById('heightDisplay');
+        const dropButton = document.getElementById('dropButton');
+
+        function updateHeightDisplay(sliderValue) {
             const t = sliderValue / 100;
-            
-            // Use exponential function for dramatic upward change
-            // When t = 1 (slider = 100), height = baseHeight
-            // When t = 0 (slider = 0), height = maxHeight
-            height = baseHeight + (maxHeight - baseHeight) * Math.pow(1 - t, 2);
-            
+            const baseHeight = 10;
+            const maxHeight = 130;
+            const height = baseHeight + (maxHeight - baseHeight) * Math.pow(1 - t, 2);
+            const displayHeight = 130 - height;
+            const heightInMeters = (displayHeight / 3.4).toFixed(1);
+            heightDisplay.textContent = `Height: ${heightInMeters}m`;
+            heightInput.value = heightInMeters;
+            return height;
+        }
+
+        function updateFromHeightInput() {
+            const heightInMeters = parseFloat(heightInput.value);
+            if (heightInMeters >= 0 && heightInMeters <= 40) {
+                const displayHeight = heightInMeters * 3.4;
+                const height = 130 - displayHeight;
+                const t = 1 - Math.sqrt((height - 10) / 120);
+                slider.value = Math.max(0, Math.min(100, t * 100));
+                heightDisplay.textContent = `Height: ${heightInMeters.toFixed(1)}m`;
+                startPoint = createStaticBodies(height);
+            }
+        }
+
+        slider.addEventListener('input', () => {
+            const height = updateHeightDisplay(parseInt(slider.value));
             startPoint = createStaticBodies(height);
         });
 
-        // Keyboard handling
+        heightInput.addEventListener('change', updateFromHeightInput);
+        heightInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                updateFromHeightInput();
+            }
+        });
+
+        dropButton.addEventListener('click', () => {
+            dropBall(startPoint);
+        });
+
         document.addEventListener('keydown', (event) => {
             if (event.code === 'Space') {
                 dropBall(startPoint);
             }
         });
 
-        // Add mouse control
         const mouse = Mouse.create(render.canvas);
         const mouseConstraint = MouseConstraint.create(engine, {
             mouse: mouse,
@@ -182,7 +246,6 @@
         });
         World.add(engine.world, mouseConstraint);
 
-        // Run the engine and renderer
         Engine.run(engine);
         Render.run(render);
 
@@ -190,6 +253,8 @@
         setInterval(() => {
             Engine.update(engine, 1000 / 60);
         }, 1000 / 60);
+
+        updateHeightDisplay(100);
     </script>
 </body>
-</html>
+</html> 
