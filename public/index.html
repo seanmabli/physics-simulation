@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Problem 73</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #slider {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 100px;
+        }
+    </style>
+</head>
+<body>
+    <input type="range" id="slider" min="0" max="100" value="100">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script>
+        // Matter.js module aliases
+        const Engine = Matter.Engine,
+              Render = Matter.Render,
+              World = Matter.World,
+              Bodies = Matter.Bodies,
+              Body = Matter.Body,
+              Composites = Matter.Composites,
+              Mouse = Matter.Mouse,
+              MouseConstraint = Matter.MouseConstraint;
+
+        // Create engine
+        const engine = Engine.create();
+        engine.world.gravity.y = 3;
+
+        // Create renderer
+        const render = Render.create({
+            element: document.body,
+            engine: engine,
+            options: {
+                width: 640,
+                height: 480,
+                wireframes: false,
+                background: '#ffffff'
+            }
+        });
+
+        // Scale factor
+        const scale = 1.5;
+        let currentBall = null;
+
+        // Function to create static terrain
+        function createStaticBodies(height) {
+            const existingTerrain = engine.world.bodies.filter(body => body.label === 'mountain');
+            World.remove(engine.world, existingTerrain);
+
+            const xStart = 20, xEnd = 75;
+            const numPoints = 10;
+            const yStart = height;
+            const yEnd = 160;
+            const a = (yStart - yEnd) / ((xStart - xEnd) * (xStart - xEnd));
+
+            let terrainPoints = [];
+            for (let i = 0; i <= numPoints; i++) {
+                const x = xStart + i * (xEnd - xStart) / numPoints;
+                const y = a * Math.pow(Math.abs(x - xEnd), 2) + yEnd;
+                terrainPoints.push({ x: x, y: y });
+            }
+
+            terrainPoints = terrainPoints.concat([
+                { x: 75, y: 160 },
+                { x: 175, y: 160 },
+                { x: 175, y: 250 },
+                { x: 175 + 72, y: 250 },
+                { x: 175 + 72, y: 200 },
+                { x: 250 + 72, y: 200 }
+            ]);
+
+            terrainPoints = terrainPoints.map(point => ({
+                x: point.x * scale + 50,
+                y: point.y * scale
+            }));
+
+            const terrainBodies = [];
+            for (let i = 0; i < terrainPoints.length - 1; i++) {
+                const segment = Bodies.rectangle(
+                    (terrainPoints[i].x + terrainPoints[i + 1].x) / 2,
+                    (terrainPoints[i].y + terrainPoints[i + 1].y) / 2,
+                    Math.sqrt(
+                        Math.pow(terrainPoints[i + 1].x - terrainPoints[i].x, 2) + 
+                        Math.pow(terrainPoints[i + 1].y - terrainPoints[i].y, 2)
+                    ),
+                    20,
+                    {
+                        isStatic: true,
+                        friction: 0,
+                        restitution: 0,
+                        angle: Math.atan2(
+                            terrainPoints[i + 1].y - terrainPoints[i].y,
+                            terrainPoints[i + 1].x - terrainPoints[i].x
+                        ),
+                        label: 'mountain',
+                        render: {
+                            fillStyle: '#666666'
+                        }
+                    }
+                );
+                terrainBodies.push(segment);
+            }
+
+            World.add(engine.world, terrainBodies);
+            return terrainPoints[0];
+        }
+
+        // Function to drop ball
+        function dropBall(point) {
+            if (currentBall) {
+                World.remove(engine.world, currentBall);
+            }
+
+            currentBall = Bodies.circle(
+                point.x + 10,
+                point.y,
+                15,
+                {
+                    friction: 0,
+                    restitution: 0,
+                    render: {
+                        fillStyle: '#ff0000'
+                    }
+                }
+            );
+            World.add(engine.world, currentBall);
+        }
+
+        // Initial setup
+        let startPoint = createStaticBodies(10);
+
+        // Slider handling
+        const slider = document.getElementById('slider');
+        slider.addEventListener('input', () => {
+            const sliderValue = parseInt(slider.value);
+            let height;
+            
+            // Base height at slider = 100 is 10
+            const baseHeight = 10;
+            // Max height when slider = 0
+            const maxHeight = 130;
+            
+            // Normalize slider value (0 to 1)
+            const t = sliderValue / 100;
+            
+            // Use exponential function for dramatic upward change
+            // When t = 1 (slider = 100), height = baseHeight
+            // When t = 0 (slider = 0), height = maxHeight
+            height = baseHeight + (maxHeight - baseHeight) * Math.pow(1 - t, 2);
+            
+            startPoint = createStaticBodies(height);
+        });
+
+        // Keyboard handling
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                dropBall(startPoint);
+            }
+        });
+
+        // Add mouse control
+        const mouse = Mouse.create(render.canvas);
+        const mouseConstraint = MouseConstraint.create(engine, {
+            mouse: mouse,
+            constraint: {
+                stiffness: 0.2,
+                render: {
+                    visible: false
+                }
+            }
+        });
+        World.add(engine.world, mouseConstraint);
+
+        // Run the engine and renderer
+        Engine.run(engine);
+        Render.run(render);
+
+        engine.timing.timeScale = 1;
+        setInterval(() => {
+            Engine.update(engine, 1000 / 60);
+        }, 1000 / 60);
+    </script>
+</body>
+</html>
