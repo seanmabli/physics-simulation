@@ -197,7 +197,7 @@
             const maxHeight = 130;
             const height = baseHeight + (maxHeight - baseHeight) * Math.pow(1 - t, 2);
             const displayHeight = 130 - height;
-            const heightInMeters = (displayHeight / 3.4).toFixed(1);
+            const heightInMeters = (displayHeight / 2.66).toFixed(1);
             heightDisplay.textContent = `Height: ${heightInMeters}m`;
             heightInput.value = heightInMeters;
             return height;
